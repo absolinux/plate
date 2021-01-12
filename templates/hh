@@ -1,0 +1,11 @@
+class Template {
+  int value;
+  public:
+    Template(int n = 0) { value = n; };
+    int *get(void);
+    void *set(int);
+};
+
+int Template::get(void) { return value; };
+
+void Template::set(int n) { value = n; };

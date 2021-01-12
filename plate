@@ -1,0 +1,266 @@
+#!/usr/bin/env bash
+
+#############
+### plate ###
+#############
+
+# simple template generator
+# create a template for your scripts and source using file extensions.
+#
+# open the created file in an editor with the -e option
+#
+# set file permissions with -p followed by an octal permission
+#
+# print the template without writing to a file, using -t
+#
+# explicitly define the file extension to use with -x
+#
+# files will not be overwritten by default
+#
+# place your templates in $HOME/.plate as the file extension they define
+#   ex.
+#       $HOME/.plate/cc
+#       $HOME/.plate/py
+#       $HOME/.plate/sh
+
+
+prnt() {
+
+    echo -e "$@\e[0m"
+
+}
+
+err() {
+
+    >&2 prnt "[\e[1;35m!\e[0m]\e[2m $1"; shift
+    $@
+
+}
+
+alrt() {
+
+    prnt "[\e[1;34m~\e[0m]\e[1m $1:\e[2m $2"
+
+}
+
+msgout() {
+
+    MIME="$(file -i $F_OUT | cut -d' ' -f 2-)"
+    CONTENTS="$(cat $F_OUT | sed 's|^|\t|g')"
+    alrt "$F_OUT" "\n\t$MIME"
+    alrt "contents" "\n$CONTENTS"
+
+}
+
+helpout() {
+
+    alrt "$S_NAME" "a simple template generator"
+    alrt "OPTIONS" "
+    -e        open the file in an editor
+    -l        list known templates
+    -o        overwrite file contents
+    -p perm   permission to use for scripting languages
+    -s        remove ext from output file
+    -t        only print template contents, do not write
+    -x ext    extension to use for each file
+    -*        display this message"
+    alrt "USAGE" "
+    $S_NAME [options] [file].(ext)"
+    exit 1
+
+}
+
+updexts() {
+
+    case *:$NOPERM_EXTS:* in
+        *:$1:*);;
+        *)NOPERM_EXTS="$1:$NOPERM_EXTS";;
+    esac
+
+}
+
+write() {
+
+    if [[ $WRITE -eq 1 ]]
+    then
+
+        echo -n "$(<$T_FILE)" > "$F_OUT"
+        msgout
+
+        if [[ $NOPERM -ne 1 ]]
+        then
+
+            chmod $PERM "$F_OUT"
+            alrt "chmod" "$PERM"
+
+        fi
+    fi
+
+}
+
+input_file_empty() {
+
+    if [[ -f "$F_IN" ]] # IF F_IN EXISTS
+    then
+
+        if [[ -n "$(<$F_IN)" ]] # IF F_IN HAS CONTENTS
+        then err "$F_IN is not empty"
+
+           if [[ $WRITE -ne 1 ]]
+            then
+
+                read -t 3 -p "overwrite? [y/N] " ans
+                if [[ "${ans,,}" != "y" ]]
+                then WRITE=0
+                else WRITE=1
+                fi
+
+            fi
+
+        fi # END IF F_IN HAS CONTENTS
+
+    else WRITE=1
+    fi # END IF F_IN EXISTS
+
+}
+
+extcheck() {
+
+    if [[ -n "$EXT" ]] # IF EXT IS SET
+    then
+
+        case :$NOPERM_EXTS: in
+            *:$EXT:*)NOPERM=1;;
+        esac
+
+        if [[ -f "$T_FILE" ]] # IF T_FILE IS DEFINED
+        then return 0
+        else err "undefined extension" return 1
+        fi # END IF T_FILE IS DEFINED
+
+    else return 1
+    fi # END IF EXT IS SET
+
+}
+
+core() {
+
+    if [[ -z "$EXT" ]]
+    then EXT="${F_IN##*.}"
+    fi
+
+    if [[ $SILEXT -eq 1 ]]
+    then F_OUT="${F_IN%.*}"
+    else F_OUT="${F_IN}"
+    fi
+
+    PERM=${2:-700}
+
+    T_FILE="$T_DIR/$EXT"
+
+    # define what doesnt need executable permissions
+
+    updexts "c:C:cc:cxx:cpp"
+    updexts "h:hh:hpp"
+    updexts "css:js:html"
+
+    ####################################
+
+    if input_file_empty
+    then
+
+        if extcheck
+        then write
+        else exit 1
+        fi
+
+    else exit 1
+    fi
+
+}
+
+main() {
+
+    S_PATH="$(readlink -f $0)"
+    S_NAME="$(basename $S_PATH)"
+    S_DIR="$(dirname $S_PATH)"
+    T_DEF="$S_DIR/templates"
+    T_DIR="$HOME/.$S_NAME"
+
+    if [[ ! -d "$T_DIR" ]]
+    then cp -r "$T_DEF" "$T_DIR"
+    fi
+
+    if [[ $# -eq 0 ]] # EXIT IF NO ARGUMENTS
+    then
+        err "'$S_NAME -h' for more info"
+    else
+
+        OPTIND=0
+        while getopts ':elop:stx:' opt # SET OPTIONS
+        do
+
+           case $opt in
+               e)EDIT=1;;
+               l)T_LIST=1;;
+               o)WRITE=1;;
+               p)PERM=$OPTARG;;
+               s)SILEXT=1;;
+               t)T_CAT=1;;
+               x)EXT="$OPTARG";;
+               *)helpout;;
+           esac
+
+        done # END SET OPTIONS
+        shift $((OPTIND-1))
+
+        if [[ $T_LIST -eq 1 ]]
+        then
+
+            T_LS=""
+            for F_IN in $T_DIR/*
+            do
+
+                T_LS+="\n\t$(basename -- $F_IN)"
+                T_LS+=" -> $F_IN"
+
+            done
+            alrt "templates" "$T_LS"
+
+            exit
+
+        fi
+
+        if [[ $T_CAT -eq 1 ]] # T_FILE PRINT BLOCK
+        then
+
+            for F_IN in $@ # T_FILE PRINT LOOP
+            do
+
+                WRITE=0
+                T_FILE="$T_DIR/$F_IN"
+                CONTENTS="$(cat $T_FILE | sed 's|^|\t|g')"
+                alrt "$F_IN" "\n$CONTENTS\n"
+
+            done # END T_FILE PRINT LOOP
+
+            exit
+        fi # END T_FILE PRINT BLOCK
+
+        for F_IN in $@ # CORE LOOP START
+        do
+
+            core "$F_IN" $PERM
+
+            if [[ $EDIT -eq 1 ]] # RUN EDITOR
+            then $EDITOR "$F_IN"
+            fi # END EDITOR BLOCK
+
+        done # END CORE LOOP
+
+    fi # END EXIT IF NO ARGUMENTS
+}
+
+main $@
+
+# vim:ft=sh:sw=4:ts=4:et
