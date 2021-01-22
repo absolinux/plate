@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+
+core() {
+
+    if [[ -z "$EXT" ]]
+    then EXT="${F_IN##*.}"
+    fi
+
+    if [[ $SILEXT -eq 1 ]]
+    then F_OUT="${F_IN%.*}"
+    else F_OUT="${F_IN}"
+    fi
+
+    PERM=${2:-700}
+
+    T_FILE="$T_DIR/$EXT"
+
+    # define what doesnt need executable permissions
+
+    addext "c:C:cc:cxx:cpp"
+    addext "h:hh:hpp"
+    addext "css:js:html"
+
+    ####################################
+
+    if input_file_empty
+    then
+
+        if extcheck
+        then write
+        else exit 1
+        fi
+
+    else exit 1
+    fi
+
+}
+

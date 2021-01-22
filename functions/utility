@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+
+addext() {
+
+    case *:$NOPERM_EXTS:* in
+        *:$1:*);;
+        *)NOPERM_EXTS="$1:$NOPERM_EXTS";;
+    esac
+
+}
+
+write() {
+
+    if [[ $WRITE -eq 1 ]]
+    then
+
+        echo -n "$(<$T_FILE)" > "$F_OUT"
+        msgout
+
+        if [[ $NOPERM -ne 1 ]]
+        then
+
+            chmod $PERM "$F_OUT"
+            alrt "chmod" "$PERM"
+
+        fi
+    fi
+
+}
+
+input_file_empty() {
+
+    if [[ -f "$F_IN" ]]
+    then
+
+        if [[ -n "$(<$F_IN)" ]]
+        then err "$F_IN is not empty"
+
+           if [[ $WRITE -ne 1 ]]
+            then
+
+                read -t 3 -p "overwrite? [y/N] " ans
+                if [[ "${ans,,}" != "y" ]]
+                then WRITE=0
+                else WRITE=1
+                fi
+
+            fi
+
+        fi
+
+    else WRITE=1
+    fi
+
+}
+
+extcheck() {
+
+    if [[ -n "$EXT" ]]
+    then
+
+        case :$NOPERM_EXTS: in
+            *:$EXT:*)NOPERM=1;;
+        esac
+
+        if [[ -f "$T_FILE" ]]
+        then return 0
+        else err "undefined extension" return 1
+        fi
+
+    else return 1
+    fi
+
+}
+
+list_known_templates() {
+
+    alrt "path" "$T_DIR"
+
+    T_LS=""
+
+    for F_IN in $T_DIR/*
+    do
+
+        T_NAME="$(basename -- $F_IN)"
+        T_LS+="\n\t$T_NAME"
+        T_LS+=" -> \$HOME/$(basename -- $T_DIR)/$T_NAME"
+
+    done
+
+    alrt "templates" "$T_LS"
+
+    exit
+
+}
+
+print_template_contents() {
+
+    if [[ $# -eq 0 ]]
+    then
+        T_LIST=1 list_known_templates
+    fi
+
+    for F_IN in $@
+    do
+
+        WRITE=0
+        T_FILE="$T_DIR/$F_IN"
+        CONTENTS="$(cat $T_FILE | sed 's|^|\t|g')"
+        alrt "$F_IN" "\n$CONTENTS\n"
+
+    done
+
+    exit
+
+}
+
+run_core_loop() {
+
+    for F_IN in $@
+    do
+
+        core "$F_IN" $PERM
+
+        if [[ $EDIT -eq 1 ]]
+        then $EDITOR "$F_IN"
+        fi
+
+    done
+
+}

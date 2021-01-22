@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+
+prnt() {
+
+    echo -e "$@\e[0m"
+
+}
+
+err() {
+
+    >&2 prnt "[\e[1;35m!\e[0m]\e[2m $1"; shift
+    $@
+
+}
+
+alrt() {
+
+    prnt "[\e[1;34m~\e[0m]\e[1m $1:\e[2m $2"
+
+}
+
+msgout() {
+
+    MIME="$(file -i $F_OUT | cut -d' ' -f 2-)"
+    CONTENTS="$(cat $F_OUT | sed 's|^|\t|g')"
+    alrt "$F_OUT" "\n\t$MIME"
+    alrt "contents" "\n$CONTENTS"
+
+}
+
+helpout() {
+
+    alrt "$S_NAME" "a simple template generator"
+    alrt "OPTIONS" "
+    -e        open the file in an editor
+    -l        list known templates
+    -o        overwrite file contents
+    -p perm   permission to use for scripting languages
+    -s        remove ext from output file
+    -t        only print template contents, do not write
+    -x ext    extension to use for each file
+    -*        display this message"
+    alrt "USAGE" "
+    $S_NAME [options] [file].(ext)"
+    exit 1
+
+}
